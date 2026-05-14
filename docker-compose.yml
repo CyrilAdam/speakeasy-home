@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DB_PATH: /data/speakeasy.db
+    volumes:
+      - db-data:/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
