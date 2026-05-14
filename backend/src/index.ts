@@ -1,19 +1,10 @@
-import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import bottles from './routes/bottles.js';
-import cocktails from './routes/cocktails.js';
+import db from './db/client.js';
+import { createApp } from './app.js';
 
-const app = new Hono();
-
+const app = createApp(db);
 app.use('*', logger());
-app.use('*', cors({ origin: '*' }));
-
-app.route('/api/bottles', bottles);
-app.route('/api/cocktails', cocktails);
-
-app.get('/health', (c) => c.json({ status: 'ok' }));
 
 const PORT = Number(process.env.PORT ?? 3001);
 
