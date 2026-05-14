@@ -9,7 +9,7 @@
 import { readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import db, { withTransaction } from './client.ts';
+import db, { withTransaction } from './client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEEDS_DIR = join(__dirname, 'seeds');

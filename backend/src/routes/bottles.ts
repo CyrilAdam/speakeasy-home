@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import db from '../db/client.ts';
-import type { Bottle } from '../types.ts';
+import db from '../db/client.js';
+import type { Bottle } from '../types.js';
 
 const app = new Hono();
 
@@ -58,7 +58,7 @@ app.patch('/:id', async (c) => {
   const body = await c.req.json<Partial<Omit<Bottle, 'id'>>>();
 
   const fields: string[] = [];
-  const values: unknown[] = [];
+  const values: (string | number)[] = [];
 
   if (body.name     !== undefined) { fields.push('name = ?');     values.push(body.name); }
   if (body.category !== undefined) { fields.push('category = ?'); values.push(body.category); }
@@ -80,14 +80,14 @@ app.delete('/:id', (c) => {
 
   const inUse = db.prepare(
     'SELECT COUNT(*) as cnt FROM cocktail_ingredients WHERE bottle_id = ?'
-  ).get(id) as { cnt: number };
+  ).get(id) as { cnt: number } | undefined;
 
-  if (inUse.cnt > 0) {
+  if (inUse && inUse.cnt > 0) {
     return c.json({ error: `Cette bouteille est utilisée dans ${inUse.cnt} recette(s)` }, 409);
   }
 
-  const result = db.prepare('DELETE FROM bottles WHERE id = ?').run(id);
-  if ((result as { changes: number }).changes === 0) {
+  const result = db.prepare('DELETE FROM bottles WHERE id = ?').run(id) as { changes: number };
+  if (result.changes === 0) {
     return c.json({ error: 'Bouteille introuvable' }, 404);
   }
 

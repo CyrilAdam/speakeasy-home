@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+export type { DatabaseSync };
 import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
