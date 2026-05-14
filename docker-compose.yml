@@ -24,8 +24,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.speakeasyhome.rule=Host(`speakeasyhome.stacklab.be`)"
-      - "traefik.http.routers.speakeasyhome.entrypoints=web"
+      - "traefik.http.routers.speakeasyhome.entrypoints=websecure"
+      - "traefik.http.routers.speakeasyhome.tls.certresolver=letsencrypt"
       - "traefik.http.services.speakeasyhome.loadbalancer.server.port=80"
+      - "traefik.docker.network=budgetmanager_budgetmanager-network"
 
 volumes:
   db-data:
