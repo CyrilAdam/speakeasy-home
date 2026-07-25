@@ -10,6 +10,13 @@ services:
       DB_PATH: /data/speakeasy.db
     volumes:
       - db-data:/data
+    networks:
+      # Alias explicite : le frontend est aussi attaché au réseau Traefik
+      # partagé, où un autre service s'appelle déjà « backend ». Docker y
+      # résolvait ce nom vers le mauvais container, d'où des 502 sur /api.
+      default:
+        aliases:
+          - speakeasy-backend
 
   frontend:
     build:
