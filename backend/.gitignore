@@ -1,3 +1,5 @@
 node_modules/
 dist/
-db/
+# Ancré à la racine du backend : sinon la règle attrape aussi src/db/,
+# et tout nouveau fichier de schéma ou de seed serait ignoré sans bruit.
+/db/
