@@ -114,6 +114,7 @@ export default function App() {
       {editingBottle && (
         <EditBottleModal
           bottle={editingBottle}
+          bottles={bottles}
           onSave={async (data) => { await updateBottle(editingBottle.id, data); }}
           onDelete={async () => { await deleteBottle(editingBottle.id); }}
           onClose={closeEditBottle}

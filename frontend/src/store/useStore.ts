@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client.ts';
+import type { NewBottle, BottlePatch } from '../api/client.ts';
 import type { Bottle, CocktailListItem, CocktailWithIngredients } from '../types.ts';
 
 interface AppState {
@@ -29,8 +30,8 @@ interface AppState {
   // ── Actions — data ────────────────────────────────────────────────────────
   loadAll:        () => Promise<void>;
   toggleBottle:   (id: string) => Promise<void>;
-  addBottle:      (data: Omit<Bottle, 'pantry'> & { pantry?: boolean }) => Promise<void>;
-  updateBottle:   (id: string, data: Partial<Omit<Bottle, 'id'>>) => Promise<void>;
+  addBottle:      (data: NewBottle) => Promise<void>;
+  updateBottle:   (id: string, data: BottlePatch) => Promise<void>;
   deleteBottle:   (id: string) => Promise<void>;
   addCocktail:    (data: Parameters<typeof api.cocktails.create>[0]) => Promise<void>;
   updateCocktail: (id: string, data: Parameters<typeof api.cocktails.update>[1]) => Promise<void>;
@@ -101,9 +102,9 @@ export const useStore = create<AppState>((set, get) => ({
     set(s => ({ bottles: s.bottles.map(b => b.id === id ? { ...b, owned } : b) }));
     try {
       await api.bottles.update(id, { owned });
-      // Refresh cocktails (canMake changes)
-      const cocktails = await api.cocktails.list();
-      set({ cocktails });
+      // Cocher une marque rend son générique disponible : les deux listes bougent.
+      const [bottles, cocktails] = await Promise.all([api.bottles.list(), api.cocktails.list()]);
+      set({ bottles, cocktails });
     } catch {
       // Rollback
       set(s => ({ bottles: s.bottles.map(b => b.id === id ? { ...b, owned: !owned } : b) }));
@@ -111,26 +112,21 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addBottle: async (data) => {
-    const bottle = await api.bottles.create(data);
-    set(s => ({ bottles: [...s.bottles, bottle] }));
+    await api.bottles.create(data);
+    const [bottles, cocktails] = await Promise.all([api.bottles.list(), api.cocktails.list()]);
+    set({ bottles, cocktails });
   },
 
   updateBottle: async (id, data) => {
-    const bottle = await api.bottles.update(id, data);
-    set(s => ({
-      bottles: s.bottles.map(b => b.id === id ? bottle : b),
-      editingBottle: null,
-    }));
-    const cocktails = await api.cocktails.list();
-    set({ cocktails });
+    await api.bottles.update(id, data);
+    const [bottles, cocktails] = await Promise.all([api.bottles.list(), api.cocktails.list()]);
+    set({ bottles, cocktails, editingBottle: null });
   },
 
   deleteBottle: async (id) => {
     await api.bottles.delete(id);
-    set(s => ({
-      bottles: s.bottles.filter(b => b.id !== id),
-      editingBottle: null,
-    }));
+    const [bottles, cocktails] = await Promise.all([api.bottles.list(), api.cocktails.list()]);
+    set({ bottles, cocktails, editingBottle: null });
   },
 
   addCocktail: async (data) => {

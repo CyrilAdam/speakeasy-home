@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Bottle } from '../types.ts';
-import { BOTTLE_CATEGORIES } from '../types.ts';
+import { BOTTLE_CATEGORIES, isAbstract } from '../types.ts';
+import type { NewBottle } from '../api/client.ts';
 import { AmbientHeader } from '../components/ui/AmbientHeader.tsx';
 import { Icon } from '../components/ui/Icon.tsx';
 import { AddBottleModal } from '../modals/AddBottleModal.tsx';
@@ -8,7 +9,7 @@ import { AddBottleModal } from '../modals/AddBottleModal.tsx';
 interface BarScreenProps {
   bottles: Bottle[];
   toggleBottle: (id: string) => void;
-  addBottle: (data: { id: string; name: string; category: string; color: string; owned: boolean; pantry?: boolean }) => Promise<void>;
+  addBottle: (data: NewBottle) => Promise<void>;
   isManager: boolean;
   onEditBottle: (b: Bottle) => void;
   onManageCategories: () => void;
@@ -18,13 +19,16 @@ const catColor = (cat: string) => BOTTLE_CATEGORIES.find(c => c.label === cat)?.
 
 export const BarScreen = ({ bottles, toggleBottle, addBottle, isManager, onEditBottle, onManageCategories }: BarScreenProps) => {
   const [showAdd, setShowAdd] = useState(false);
-  const categories = [...new Set(bottles.map(b => b.category))];
-  const ownedCount = bottles.filter(b => b.owned).length;
-  const pct = bottles.length > 0 ? Math.round((ownedCount / bottles.length) * 100) : 0;
+  // L'inventaire ne montre que des produits réels : les génériques qui ont des
+  // marques ("Gin") n'existent que pour les recettes.
+  const shelf = bottles.filter(b => !isAbstract(b));
+  const categories = [...new Set(shelf.map(b => b.category))];
+  const ownedCount = shelf.filter(b => b.owned).length;
+  const pct = shelf.length > 0 ? Math.round((ownedCount / shelf.length) * 100) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      {showAdd && <AddBottleModal onAdd={addBottle} onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddBottleModal bottles={bottles} onAdd={addBottle} onClose={() => setShowAdd(false)} />}
       <AmbientHeader />
       <div style={{ padding: '18px 20px 14px', flexShrink: 0, position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -37,7 +41,7 @@ export const BarScreen = ({ bottles, toggleBottle, addBottle, isManager, onEditB
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>Mon Bar</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', paddingBottom: 2 }}>{ownedCount} / {bottles.length}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', paddingBottom: 2 }}>{ownedCount} / {shelf.length}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, height: 5 }}>
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: 'linear-gradient(90deg, #74C69D, #A0C4FF)', transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)' }} />
@@ -46,7 +50,7 @@ export const BarScreen = ({ bottles, toggleBottle, addBottle, isManager, onEditB
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 80px' }}>
         {categories.map(cat => {
-          const catBottles = bottles.filter(b => b.category === cat);
+          const catBottles = shelf.filter(b => b.category === cat);
           const color = catColor(cat);
           return (
             <div key={cat} style={{ marginBottom: 22 }}>

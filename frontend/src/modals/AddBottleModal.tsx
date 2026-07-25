@@ -1,24 +1,38 @@
 import { useState } from 'react';
+import type { Bottle } from '../types.ts';
 import { BOTTLE_CATEGORIES } from '../types.ts';
+import type { NewBottle } from '../api/client.ts';
 
 interface AddBottleModalProps {
-  onAdd: (data: { id: string; name: string; category: string; color: string; owned: boolean; pantry?: boolean }) => Promise<void>;
+  bottles: Bottle[];
+  onAdd: (data: NewBottle) => Promise<void>;
   onClose: () => void;
 }
 
-export const AddBottleModal = ({ onAdd, onClose }: AddBottleModalProps) => {
+export const AddBottleModal = ({ bottles, onAdd, onClose }: AddBottleModalProps) => {
   const [name, setName]         = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [pantry, setPantry]     = useState(false);
+  const [generic, setGeneric]   = useState('');
   const [loading, setLoading]   = useState(false);
 
   const selectedCat = BOTTLE_CATEGORIES.find(c => c.label === category);
   const canSubmit = name.trim() && category;
 
+  // Une marque ne peut se rattacher qu'à une bouteille qui n'est pas elle-même
+  // une marque — pas de chaîne de génériques.
+  const families = bottles
+    .filter(b => !b.genericId && !b.pantry)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
   const handleAdd = async () => {
     if (!canSubmit || !selectedCat) return;
     setLoading(true);
-    await onAdd({ id: `b-${Date.now()}`, name: name.trim(), category: selectedCat.label, color: selectedCat.color, owned: true, pantry });
+    await onAdd({
+      id: `b-${Date.now()}`, name: name.trim(), category: selectedCat.label,
+      color: selectedCat.color, owned: true, pantry,
+      genericId: generic || null,
+    });
     setLoading(false);
     onClose();
   };
@@ -50,6 +64,19 @@ export const AddBottleModal = ({ onAdd, onClose }: AddBottleModalProps) => {
                 {cat.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div style={{ padding: '0 20px 14px' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 7 }}>Famille</div>
+          <select value={generic} onChange={e => setGeneric(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: '12px 14px', color: '#fff', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+          >
+            <option value="">Aucune — bouteille autonome</option>
+            {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+            Rattachée à une famille, elle rend réalisables toutes les recettes qui la citent.
           </div>
         </div>
 

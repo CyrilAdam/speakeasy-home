@@ -1,14 +1,17 @@
-import { BOTTLE_CATEGORIES } from '../types.ts';
+import type { Bottle } from '../types.ts';
+import { BOTTLE_CATEGORIES, isAbstract } from '../types.ts';
 
 interface ManageCategoriesModalProps {
-  bottles: { category: string }[];
+  bottles: Bottle[];
   onClose: () => void;
 }
 
 const getCatColor = (cat: string) => BOTTLE_CATEGORIES.find(c => c.label === cat)?.color ?? '#9E9E9E';
 
 export const ManageCategoriesModal = ({ bottles, onClose }: ManageCategoriesModalProps) => {
-  const categories = [...new Set(bottles.map(b => b.category))].sort();
+  // Mêmes bouteilles que l'inventaire : les génériques abstraits ne comptent pas.
+  const shelf = bottles.filter(b => !isAbstract(b));
+  const categories = [...new Set(shelf.map(b => b.category))].sort();
 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 160, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={onClose}>
@@ -22,7 +25,7 @@ export const ManageCategoriesModal = ({ bottles, onClose }: ManageCategoriesModa
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 30px', display: 'flex', flexDirection: 'column', gap: 7 }}>
           {categories.map(cat => {
-            const count = bottles.filter(b => b.category === cat).length;
+            const count = shelf.filter(b => b.category === cat).length;
             const color = getCatColor(cat);
             return (
               <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '12px 14px' }}>

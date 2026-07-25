@@ -3,8 +3,13 @@ export interface Bottle {
   name: string;
   category: string;
   color: string;
+  /** Possession effective : vraie si la bouteille ou l'une de ses marques est possédée. */
   owned: boolean;
   pantry: boolean;
+  /** Générique auquel cette marque est rattachée (null = produit autonome). */
+  genericId: string | null;
+  /** Nombre de marques rattachées. > 0 ⇒ bouteille générique, abstraite. */
+  variantCount: number;
 }
 
 export interface CocktailTheme {

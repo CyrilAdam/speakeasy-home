@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { Bottle } from '../types.ts';
 import { BOTTLE_CATEGORIES } from '../types.ts';
+import type { BottlePatch } from '../api/client.ts';
 
 interface EditBottleModalProps {
   bottle: Bottle;
-  onSave: (data: Partial<Omit<Bottle, 'id'>>) => Promise<void>;
+  bottles: Bottle[];
+  onSave: (data: BottlePatch) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
 }
@@ -18,20 +20,26 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'inherit', outline: 'none',
 };
 
-export const EditBottleModal = ({ bottle, onSave, onDelete, onClose }: EditBottleModalProps) => {
+export const EditBottleModal = ({ bottle, bottles, onSave, onDelete, onClose }: EditBottleModalProps) => {
   const [name, setName]         = useState(bottle.name);
   const [category, setCategory] = useState(bottle.category);
   const [pantry, setPantry]     = useState(!!bottle.pantry);
+  const [generic, setGeneric]   = useState(bottle.genericId ?? '');
   const [confirm, setConfirm]   = useState(false);
   const [loading, setLoading]   = useState(false);
   const canSave = name.trim() && category;
 
   const categories = [...new Set([...BOTTLE_CATEGORIES.map(c => c.label)])];
 
+  // Ni elle-même, ni une marque : pas de chaîne de génériques.
+  const families = bottles
+    .filter(f => f.id !== bottle.id && !f.genericId && !f.pantry)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
   const handleSave = async () => {
     if (!canSave) return;
     setLoading(true);
-    await onSave({ name: name.trim(), category, color: getCatColor(category), pantry });
+    await onSave({ name: name.trim(), category, color: getCatColor(category), pantry, genericId: generic || null });
     setLoading(false);
   };
 
@@ -64,6 +72,19 @@ export const EditBottleModal = ({ bottle, onSave, onDelete, onClose }: EditBottl
                 <button key={cat} onClick={() => setCategory(cat)} style={{ padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', background: category === cat ? `${getCatColor(cat)}28` : 'rgba(255,255,255,0.05)', border: category === cat ? `1.5px solid ${getCatColor(cat)}70` : '1.5px solid rgba(255,255,255,0.09)', color: category === cat ? getCatColor(cat) : 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: category === cat ? 700 : 400, transition: 'all 0.14s' }}>{cat}</button>
               ))}
             </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 7 }}>Famille</div>
+            {bottle.variantCount > 0 ? (
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '11px 14px' }}>
+                Générique — {bottle.variantCount} bouteille{bottle.variantCount > 1 ? 's' : ''} rattachée{bottle.variantCount > 1 ? 's' : ''}.
+              </div>
+            ) : (
+              <select value={generic} onChange={e => setGeneric(e.target.value)} style={{ ...inputStyle, appearance: 'none' }}>
+                <option value="">Aucune — bouteille autonome</option>
+                {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}>
             <div>

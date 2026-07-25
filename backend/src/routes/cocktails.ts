@@ -49,7 +49,7 @@ export function createCocktailsRouter(db: DatabaseSync) {
     const rows = (db.prepare(`
       SELECT ci.bottle_id, b.name AS bottle_name, ci.amount, ci.sort_order, b.owned
       FROM cocktail_ingredients ci
-      JOIN bottles b ON b.id = ci.bottle_id
+      JOIN bottles_effective b ON b.id = ci.bottle_id
       WHERE ci.cocktail_id = ?
       ORDER BY ci.sort_order
     `).all(cocktailId) as unknown) as IngredientRow[];
@@ -84,7 +84,7 @@ export function createCocktailsRouter(db: DatabaseSync) {
         COALESCE(SUM(CASE WHEN b.owned = 0 THEN 1 ELSE 0 END), 0) AS missing_count
       FROM cocktails c
       LEFT JOIN cocktail_ingredients ci ON ci.cocktail_id = c.id
-      LEFT JOIN bottles b ON b.id = ci.bottle_id
+      LEFT JOIN bottles_effective b ON b.id = ci.bottle_id
       GROUP BY c.id
       ORDER BY c.name
     `).all() as unknown) as (CocktailRow & { missing_count: number })[];

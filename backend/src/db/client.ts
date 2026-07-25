@@ -13,6 +13,22 @@ mkdirSync(dirname(DB_PATH), { recursive: true });
 
 const db = new DatabaseSync(DB_PATH);
 
+/**
+ * Migrations à appliquer AVANT le schéma : la vue bottles_effective référence
+ * des colonnes qui peuvent manquer sur une base créée par une version
+ * antérieure. Sur une base neuve, PRAGMA ne renvoie rien et tout est ignoré.
+ */
+function migrate() {
+  const columns = (db.prepare('PRAGMA table_info(bottles)').all() as { name: string }[])
+    .map(c => c.name);
+
+  if (columns.length > 0 && !columns.includes('generic_id')) {
+    db.exec('ALTER TABLE bottles ADD COLUMN generic_id TEXT');
+  }
+}
+
+migrate();
+
 // Appliquer le schéma au démarrage (idempotent grâce aux IF NOT EXISTS)
 const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
 db.exec(schema);

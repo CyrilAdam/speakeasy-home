@@ -2,6 +2,12 @@ import type { Bottle, CocktailListItem, CocktailWithIngredients } from '../types
 
 const BASE = '/api';
 
+/** `variantCount` est dérivé côté serveur, jamais envoyé par le client. */
+export type NewBottle = Omit<Bottle, 'pantry' | 'genericId' | 'variantCount'>
+  & { pantry?: boolean; genericId?: string | null };
+
+export type BottlePatch = Partial<Omit<Bottle, 'id' | 'variantCount'>>;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -21,9 +27,9 @@ export const api = {
   bottles: {
     list:   ()                         => request<Bottle[]>('/bottles'),
     get:    (id: string)               => request<Bottle>(`/bottles/${id}`),
-    create: (data: Omit<Bottle, 'pantry'> & { pantry?: boolean }) =>
+    create: (data: NewBottle) =>
       request<Bottle>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Omit<Bottle, 'id'>>) =>
+    update: (id: string, data: BottlePatch) =>
       request<Bottle>(`/bottles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) =>
       request<void>(`/bottles/${id}`, { method: 'DELETE' }),

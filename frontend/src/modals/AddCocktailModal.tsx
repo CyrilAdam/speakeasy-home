@@ -73,6 +73,13 @@ export const AddCocktailModal = ({ bottles, onAdd, onDelete, onClose, initialDat
   const [confirm, setConfirm]   = useState(false);
   const [loading, setLoading]   = useState(false);
 
+  // Une recette cite un ingrédient ("Gin"), pas une bouteille précise : on met
+  // en avant les génériques et les produits autonomes, les marques restent
+  // accessibles plus bas pour les recettes qui en dépendent vraiment.
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'fr');
+  const recipeBottles = bottles.filter(b => b.variantCount > 0 || !b.genericId).sort(byName);
+  const brandBottles  = bottles.filter(b => b.variantCount === 0 && b.genericId).sort(byName);
+
   const toggleMood = (m: string) => setMoods(ms => ms.includes(m) ? ms.filter(x => x !== m) : [...ms, m]);
   const updIng  = (i: number, f: keyof IngredientForm, v: string) => setIngs(arr => arr.map((it, j) => j === i ? { ...it, [f]: v } : it));
   const addIng  = () => setIngs(a => [...a, { bottleId: '', amount: '' }]);
@@ -159,7 +166,14 @@ export const AddCocktailModal = ({ bottles, onAdd, onDelete, onClose, initialDat
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 7 }}>
                 <select value={ing.bottleId} onChange={e => updIng(i, 'bottleId', e.target.value)} style={{ ...inputStyle, flex: 2, padding: '9px 12px', fontSize: 13 }}>
                   <option value="">Sélectionner…</option>
-                  {bottles.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  <optgroup label="Ingrédients">
+                    {recipeBottles.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </optgroup>
+                  {brandBottles.length > 0 && (
+                    <optgroup label="Marques précises">
+                      {brandBottles.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </optgroup>
+                  )}
                 </select>
                 <input value={ing.amount} onChange={e => updIng(i, 'amount', e.target.value)} placeholder="3 cl" style={{ ...inputStyle, flex: 1, padding: '9px 10px', fontSize: 13 }} />
                 {ingredients.length > 1 && (
