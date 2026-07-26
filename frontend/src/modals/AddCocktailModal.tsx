@@ -34,17 +34,31 @@ const MOOD_OPTIONS = ['festif','été','classique','amer','frais','élégant','f
 const GLASS_OPTIONS = ['Verre à Margarita','Old Fashioned','Verre Highball','Verre à martini','Coupe','Verre à vin','Verre à shot','Mug en cuivre','Autre'];
 const DIFF_LABELS: Record<number, string> = { 1: 'Facile', 2: 'Moyen', 3: 'Expert' };
 
-function hashTheme(name: string): CocktailTheme {
-  const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const palettes: CocktailTheme[] = [
-    { bg: '#071A0F', from: '#1B5E35', mid: '#2D9E5A', to: '#52B788', accent: '#74C69D', text: '#D8F3DC' },
-    { bg: '#190505', from: '#7B1D1D', mid: '#C0392B', to: '#E74C3C', accent: '#FF6B6B', text: '#FDEDEC' },
-    { bg: '#180900', from: '#7B3F00', mid: '#A0522D', to: '#D2691E', accent: '#E8A87C', text: '#FFF3E0' },
-    { bg: '#150010', from: '#880035', mid: '#C2185B', to: '#E91E8C', accent: '#F48FB1', text: '#FCE4EC' },
-    { bg: '#081200', from: '#2D5016', mid: '#5A8000', to: '#84A000', accent: '#A8D500', text: '#F0FFC0' },
-    { bg: '#150900', from: '#6B3000', mid: '#B87800', to: '#E8A000', accent: '#FFB830', text: '#FFF8E0' },
-  ];
-  return palettes[h % palettes.length];
+const PALETTES: CocktailTheme[] = [
+  { bg: '#071A0F', from: '#1B5E35', mid: '#2D9E5A', to: '#52B788', accent: '#74C69D', text: '#D8F3DC' },
+  { bg: '#190505', from: '#7B1D1D', mid: '#C0392B', to: '#E74C3C', accent: '#FF6B6B', text: '#FDEDEC' },
+  { bg: '#180900', from: '#7B3F00', mid: '#A0522D', to: '#D2691E', accent: '#E8A87C', text: '#FFF3E0' },
+  { bg: '#150010', from: '#880035', mid: '#C2185B', to: '#E91E8C', accent: '#F48FB1', text: '#FCE4EC' },
+  { bg: '#081200', from: '#2D5016', mid: '#5A8000', to: '#84A000', accent: '#A8D500', text: '#F0FFC0' },
+  { bg: '#150900', from: '#6B3000', mid: '#B87800', to: '#E8A000', accent: '#FFB830', text: '#FFF8E0' },
+  { bg: '#050A10', from: '#1E3A4A', mid: '#4A7A8C', to: '#9FC5D4', accent: '#D6ECF5', text: '#F2FAFF' },
+  { bg: '#0D0515', from: '#3D1A5A', mid: '#6A3A8A', to: '#A46BC4', accent: '#C5A3FF', text: '#F3E8FF' },
+];
+
+/** Tire une palette différente de l'actuelle, pour que regénérer change vraiment quelque chose. */
+function pickPalette(current: CocktailTheme | null): CocktailTheme {
+  const others = current ? PALETTES.filter(p => p.bg !== current.bg) : PALETTES;
+  return others[Math.floor(Math.random() * others.length)];
+}
+
+/** Résout seulement quand l'image est réellement décodée et affichable. */
+function preload(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve();
+    img.onerror = () => reject(new Error('image indisponible'));
+    img.src = url;
+  });
 }
 
 const inputStyle: React.CSSProperties = {
@@ -67,6 +81,9 @@ export const AddCocktailModal = ({ bottles, onAdd, onDelete, onClose, initialDat
   const [ingredients, setIngs]  = useState<IngredientForm[]>(initialData?.ingredients ?? [{ bottleId: '', amount: '' }]);
   const [steps, setSteps]       = useState<string[]>(initialData?.steps ?? ['']);
   const [generating, setGen]    = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [sceneBroken, setSceneBroken] = useState(false);
+  const [glassBroken, setGlassBroken] = useState(false);
   const [sceneUrl, setScene]    = useState<string | null>(initialData?.sceneUrl ?? null);
   const [glassUrl, setGlassUrl] = useState<string | null>(initialData?.glassUrl ?? null);
   const [theme, setTheme]       = useState<CocktailTheme | null>(initialData?.theme ?? null);
@@ -89,16 +106,40 @@ export const AddCocktailModal = ({ bottles, onAdd, onDelete, onClose, initialDat
   const rmStep  = (i: number) => setSteps(a => a.filter((_, j) => j !== i));
 
   const generate = async () => {
-    if (!name.trim()) return;
+    if (!canGenerate || generating) return;
     setGen(true);
-    const seed1 = Math.floor(Math.random() * 9999);
-    const seed2 = seed1 + 500;
-    const sp = encodeURIComponent(`${name} cocktail bar atmosphere moody cinematic dark lighting beautiful photorealistic no text no watermark`);
-    setScene(`https://image.pollinations.ai/prompt/${sp}?width=390&height=260&nologo=true&model=flux-schnell&seed=${seed1}`);
-    const gp = encodeURIComponent(`${name} cocktail glass professional photography black background studio lighting beautiful garnish bokeh`);
-    setGlassUrl(`https://image.pollinations.ai/prompt/${gp}?width=300&height=420&nologo=true&model=flux-schnell&seed=${seed2}`);
-    setTheme(hashTheme(name));
-    setGen(false);
+    setGenError(null);
+
+    // La palette ne dépend pas du réseau : on la change tout de suite, pour que
+    // chaque clic produise un résultat visible même si les images échouent.
+    setTheme(t => pickPalette(t));
+
+    const seed = Math.floor(Math.random() * 100000);
+    const build = (prompt: string, w: number, h: number, s: number) =>
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`
+      + `?width=${w}&height=${h}&nologo=true&model=flux&seed=${s}`;
+
+    const sceneSrc = build(
+      `${name} cocktail on a dark bar counter, moody cinematic speakeasy lighting, `
+      + `shallow depth of field, photorealistic, no text, no watermark`, 390, 260, seed);
+    const glassSrc = build(
+      `a single ${glass} filled with a ${name} cocktail, ${garnish.trim() || 'elegant'} garnish, `
+      + `isolated on pure black background, professional studio product photography, `
+      + `dramatic side lighting, photorealistic, no text, no watermark`, 300, 420, seed + 500);
+
+    try {
+      // Attendre le décodage : sans ça le bouton retombe avant que l'image
+      // existe, et l'aperçu reste vide sans que rien ne l'explique.
+      await Promise.all([preload(sceneSrc), preload(glassSrc)]);
+      setSceneBroken(false);
+      setGlassBroken(false);
+      setScene(sceneSrc);
+      setGlassUrl(glassSrc);
+    } catch {
+      setGenError('Génération indisponible. La palette a changé — retente pour les images.');
+    } finally {
+      setGen(false);
+    }
   };
 
   const canGenerate = name.trim().length >= 2;
@@ -252,19 +293,26 @@ export const AddCocktailModal = ({ bottles, onAdd, onDelete, onClose, initialDat
               </div>
               <button onClick={generate} disabled={!canGenerate || generating} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', cursor: canGenerate && !generating ? 'pointer' : 'default', fontFamily: 'inherit', background: canGenerate && !generating ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.06)', color: canGenerate && !generating ? '#fff' : 'rgba(255,255,255,0.2)', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
                 <span style={{ animation: generating ? 'spin 1s linear infinite' : 'none', display: 'inline-block' }}>✦</span>
-                {generating ? 'Génération…' : 'Générer'}
+                {generating ? 'Génération…' : (sceneUrl || theme) ? 'Regénérer' : 'Générer'}
               </button>
             </div>
+            {genError && (
+              <div style={{ fontSize: 11.5, color: '#FCA5A5', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 10, padding: '7px 10px', marginBottom: 10 }}>
+                {genError}
+              </div>
+            )}
             {(sceneUrl || glassUrl || theme) && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                {sceneUrl && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', opacity: generating ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+                {sceneUrl && !sceneBroken && (
                   <div style={{ flex: 2, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', minHeight: 70 }}>
-                    <img src={sceneUrl} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} onError={e => (e.currentTarget.parentElement!.style.display = 'none')} />
+                    {/* key : force le remontage à chaque nouvelle URL, sinon le navigateur
+                        garde l'image précédente le temps du chargement. */}
+                    <img key={sceneUrl} src={sceneUrl} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} onError={() => setSceneBroken(true)} />
                   </div>
                 )}
-                {glassUrl && (
+                {glassUrl && !glassBroken && (
                   <div style={{ flex: 1, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', minHeight: 70 }}>
-                    <img src={glassUrl} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} onError={e => (e.currentTarget.parentElement!.style.display = 'none')} />
+                    <img key={glassUrl} src={glassUrl} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} onError={() => setGlassBroken(true)} />
                   </div>
                 )}
                 {theme && (
